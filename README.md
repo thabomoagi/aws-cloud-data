@@ -37,10 +37,10 @@ Note: I did not add a NAT Gateway. This is intentional, not an oversight. A NAT 
 ## Project structure
 
 ```
-aws-vpc-terraform/
+aws-cloud-data/
 ├── .github/
 │   └── workflows/
-│       └── iac-pipeline.yml       # CI pipeline (fmt, init, validate, plan)
+│       └── iac-pipeline.yml       # CI pipeline (terraform checks + tests)
 ├── docs/
 │   └── screenshots/                # Proof of deployment
 ├── scripts/
@@ -50,6 +50,9 @@ aws-vpc-terraform/
 │   │   └── dev/                    # Dev environment config (calls the vpc module)
 │   └── modules/
 │       └── vpc/                    # Reusable VPC module
+├── tests/
+│   └── test_verify_deployment.py   # moto-mocked tests for the verification script
+├── pytest.ini
 ├── requirements.txt
 └── README.md
 ```
@@ -84,8 +87,8 @@ Never commit these values directly into your code.
 1. Clone the repo
 
 ```bash
-git clone https://github.com/thabomoagi/aws-vpc-terraform.git
-cd aws-vpc-terraform/terraform/environments/dev
+git clone https://github.com/thabomoagi/aws-cloud-data.git
+cd aws-cloud-data/terraform/environments/dev
 ```
 
 2. Initialize Terraform
@@ -127,6 +130,17 @@ python scripts/verify_deployment.py
 
 This script uses boto3 to query AWS directly for the VPC and its subnets, and prints out what it finds. I wrote this mainly to prove to myself that Terraform's state actually matched reality, and it turned out to be a decent way to practice using boto3.
 
+## Running Tests
+
+The verification script has tests in `tests/` that mock AWS with `moto`, so they need no AWS account, no credentials, and no deployed infrastructure:
+
+```bash
+pip install -r requirements.txt
+pytest
+```
+
+They check that the script finds a VPC by its `Name` tag, ignores VPCs that don't carry that tag, only reports the subnets attached to the matching VPC, and reports a missing deployment instead of failing silently.
+
 ## CI/CD pipeline
 
 Every push to `main` (or pull request into it) triggers a GitHub Actions workflow that:
@@ -135,6 +149,9 @@ Every push to `main` (or pull request into it) triggers a GitHub Actions workflo
 2. Initializes Terraform
 3. Validates the syntax (`terraform validate`)
 4. Runs a plan so you can see what would change
+5. Runs the Python tests for `scripts/verify_deployment.py`
+
+The Terraform steps read AWS credentials from repository secrets. The test job uses none: it mocks AWS with `moto`, so it runs without credentials and cannot reach a real account.
 
 The pipeline does **not** automatically apply changes to AWS. I kept this manual on purpose, since I didn't want infrastructure to be created or destroyed just from pushing code while I'm still learning. In a team setting with proper environments and approvals, auto-apply would make more sense.
 

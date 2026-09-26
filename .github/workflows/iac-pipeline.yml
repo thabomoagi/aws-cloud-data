@@ -6,15 +6,17 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  AWS_DEFAULT_REGION: af-south-1
+permissions:
+  contents: read
 
 jobs:
   terraform:
     name: Terraform Format, Validate & Plan
     runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: af-south-1
     defaults:
       run:
         working-directory: terraform/environments/dev
@@ -39,3 +41,22 @@ jobs:
 
       - name: Terraform Plan
         run: terraform plan
+
+  tests:
+    name: Verification Script Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest -q
